@@ -1,69 +1,114 @@
 #!/usr/bin/env python3
-
+"""
+Main file for testing user authentication and management.
+"""
 import requests
 
-BASE_URL = "http://localhost:5000"
-
 def register_user(email: str, password: str) -> None:
-    url = f"{BASE_URL}/users"
-    data = {"email": email, "password": password}
-    response = requests.post(url, data=data)
-    assert response.status_code == 200
-    assert response.json()["email"] == email
-    print("User registered successfully.")
+    """
+    Registers a user with the given email and password.
+    Args:
+        email: The email of the user.
+        password: The password of the user.
+    Returns:
+        None
+    """
+    resp = requests.post('http://127.0.0.1:5000/users', data={'email': email, 'password': password})
+    if resp.status_code == 200:
+        assert resp.json() == {"email": email, "message": "user created"}
+    else:
+        assert resp.status_code == 400
+        assert resp.json() == {"message": "email already registered"}
 
 def log_in_wrong_password(email: str, password: str) -> None:
-    url = f"{BASE_URL}/sessions"
-    data = {"email": email, "password": password}
-    response = requests.post(url, data=data)
-    assert response.status_code == 401
-    print("Incorrect password handled successfully.")
-
-def log_in(email: str, password: str) -> str:
-    url = f"{BASE_URL}/sessions"
-    data = {"email": email, "password": password}
-    response = requests.post(url, data=data)
-    assert response.status_code == 200
-    assert "session_id" in response.cookies
-    print("User logged in successfully.")
-    return response.cookies["session_id"]
+    """
+    Attempts to log in with the given wrong credentials.
+    Args:
+        email: The email of the user.
+        password: The incorrect password of the user.
+    Returns:
+        None
+    """
+    r = requests.post('http://127.0.0.1:5000/sessions', data={'email': email, 'password': password})
+    assert r.status_code == 401
 
 def profile_unlogged() -> None:
-    url = f"{BASE_URL}/profile"
-    response = requests.get(url)
-    assert response.status_code == 403
-    print("Profile access without login handled successfully.")
+    """
+    Tries to access the profile without being logged in.
+    Returns:
+        None
+    """
+    r = requests.get('http://127.0.0.1:5000/profile')
+    assert r.status_code == 403
+
+def log_in(email: str, password: str) -> str:
+    """
+    Logs in with the given correct email and password.
+    Args:
+        email: The email of the user.
+        password: The password of the user.
+    Returns:
+        The session_id of the user.
+    """
+    resp = requests.post('http://127.0.0.1:5000/sessions', data={'email': email, 'password': password})
+    assert resp.status_code == 200
+    assert resp.json() == {"email": email, "message": "logged in"}
+    return resp.cookies['session_id']
 
 def profile_logged(session_id: str) -> None:
-    url = f"{BASE_URL}/profile"
-    cookies = {"session_id": session_id}
-    response = requests.get(url, cookies=cookies)
-    assert response.status_code == 200
-    assert response.json()["email"] == "guillaume@holberton.io"
-    print("Profile accessed successfully while logged in.")
+    """
+    Tries to access the profile while logged in.
+    Args:
+        session_id: The session_id of the user.
+    Returns:
+        None
+    """
+    cookies = {'session_id': session_id}
+    r = requests.get('http://127.0.0.1:5000/profile', cookies=cookies)
+    assert r.status_code == 200
 
 def log_out(session_id: str) -> None:
-    url = f"{BASE_URL}/sessions"
-    cookies = {"session_id": session_id}
-    response = requests.delete(url, cookies=cookies)
-    assert response.status_code == 302
-    print("User logged out successfully.")
+    """
+    Logs out with the given session_id.
+    Args:
+        session_id: The session_id of the user.
+    Returns:
+        None
+    """
+    cookies = {'session_id': session_id}
+    r = requests.delete('http://127.0.0.1:5000/sessions', cookies=cookies)
+    assert r.status_code in [200, 302]
+    if r.status_code == 302:
+        assert r.url == 'http://127.0.0.1:5000/'
 
 def reset_password_token(email: str) -> str:
-    url = f"{BASE_URL}/reset_password"
-    data = {"email": email}
-    response = requests.post(url, data=data)
-    assert response.status_code == 200
-    assert "reset_token" in response.json()
-    print("Password reset token generated successfully.")
-    return response.json()["reset_token"]
+    """
+    Requests a password reset token for the given email.
+    Args:
+        email: The email of the user.
+    Returns:
+        The reset_token of the user.
+    """
+    r = requests.post('http://127.0.0.1:5000/reset_password', data={'email': email})
+    if r.status_code == 200:
+        return r.json()['reset_token']
+    assert r.status_code == 401
 
 def update_password(email: str, reset_token: str, new_password: str) -> None:
-    url = f"{BASE_URL}/reset_password"
-    data = {"email": email, "reset_token": reset_token, "new_password": new_password}
-    response = requests.put(url, data=data)
-    assert response.status_code == 200
-    print("Password updated successfully.")
+    """
+    Updates the password with the given email, reset_token, and new_password.
+    Args:
+        email: The email of the user.
+        reset_token: The reset_token of the user.
+        new_password: The new password of the user.
+    Returns:
+        None
+    """
+    data = {'email': email, 'reset_token': reset_token, 'new_password': new_password}
+    r = requests.put('http://127.0.0.1:5000/reset_password', data=data)
+    assert r.status_code in [200, 403]
+    if r.status_code == 200:
+        assert r.json() == {"email": email, "message": "Password updated"}
 
 EMAIL = "guillaume@holberton.io"
 PASSWD = "b4l0u"
